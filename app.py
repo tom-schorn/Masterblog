@@ -4,6 +4,16 @@ import json
 app = Flask(__name__)
 
 
+def fetch_post_by_id(post_id):
+    """Helper function to fetch a post by its ID"""
+    with open('data.json', 'r') as file:
+        blog_posts = json.load(file)
+    for post in blog_posts:
+        if post['id'] == post_id:
+            return post
+    return None
+
+
 @app.route('/')
 def index():
     # Fetch the blog posts from the JSON file
@@ -62,6 +72,44 @@ def delete(post_id):
 
     # Redirect back to the home page
     return redirect(url_for('index'))
+
+
+@app.route('/update/<int:post_id>', methods=['GET', 'POST'])
+def update(post_id):
+    # Fetch the blog post by ID
+    post = fetch_post_by_id(post_id)
+    if post is None:
+        # Post not found
+        return "Post not found", 404
+
+    if request.method == 'POST':
+        # Get the updated data from the form
+        author = request.form.get('author')
+        title = request.form.get('title')
+        content = request.form.get('content')
+
+        # Load existing posts
+        with open('data.json', 'r') as file:
+            blog_posts = json.load(file)
+
+        # Find and update the post
+        for p in blog_posts:
+            if p['id'] == post_id:
+                p['author'] = author
+                p['title'] = title
+                p['content'] = content
+                break
+
+        # Save back to the JSON file
+        with open('data.json', 'w') as file:
+            json.dump(blog_posts, file, indent=4)
+
+        # Redirect back to index
+        return redirect(url_for('index'))
+
+    # Else, it's a GET request
+    # So display the update.html page
+    return render_template('update.html', post=post)
 
 
 if __name__ == '__main__':
