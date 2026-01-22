@@ -47,5 +47,22 @@ def add():
     return render_template('add.html')
 
 
+@app.route('/delete/<int:post_id>')
+def delete(post_id):
+    # Load existing posts
+    with open('data.json', 'r') as file:
+        blog_posts = json.load(file)
+
+    # Find the blog post with the given id and remove it from the list
+    blog_posts = [post for post in blog_posts if post['id'] != post_id]
+
+    # Save back to the JSON file
+    with open('data.json', 'w') as file:
+        json.dump(blog_posts, file, indent=4)
+
+    # Redirect back to the home page
+    return redirect(url_for('index'))
+
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000, debug=True)
