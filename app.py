@@ -1,56 +1,45 @@
 from flask import Flask, render_template, request, redirect, url_for
-import json
+from storage import load_posts, save_posts, get_post_by_id
 
 app = Flask(__name__)
 
 
-def fetch_post_by_id(post_id):
-    """Helper function to fetch a post by its ID"""
-    with open('data.json', 'r') as file:
-        blog_posts = json.load(file)
-    for post in blog_posts:
-        if post['id'] == post_id:
-            return post
-    return None
-
-
 @app.route('/')
 def index():
-    # Fetch the blog posts from the JSON file
-    with open('data.json', 'r') as file:
-        blog_posts = json.load(file)
+    blog_posts = load_posts()
     return render_template('index.html', posts=blog_posts)
 
 
 @app.route('/add', methods=['GET', 'POST'])
 def add():
     if request.method == 'POST':
-        # Get the data from the form
-        author = request.form.get('author')
-        title = request.form.get('title')
-        content = request.form.get('content')
+        # Get and trim the data from the form
+        author = request.form.get('author', '').strip()
+        title = request.form.get('title', '').strip()
+        content = request.form.get('content', '').strip()
+
+        # Validate that no field is empty or whitespace-only
+        if not author or not title or not content:
+            error = "All fields are required and must not be blank."
+            return render_template('add.html', error=error)
 
         # Load existing posts
-        with open('data.json', 'r') as file:
-            blog_posts = json.load(file)
+        blog_posts = load_posts()
 
-        # Generate a unique ID
-        new_id = max(post['id'] for post in blog_posts) + 1
+        # Generate a unique ID (handles empty list)
+        new_id = max((post['id'] for post in blog_posts), default=0) + 1
 
-        # Create new post
+        # Create and append the new post
         new_post = {
             'id': new_id,
             'author': author,
             'title': title,
             'content': content
         }
-
-        # Add the new post to the list
         blog_posts.append(new_post)
 
-        # Save back to the JSON file
-        with open('data.json', 'w') as file:
-            json.dump(blog_posts, file, indent=4)
+        # Save back to the database
+        save_posts(blog_posts)
 
         return redirect(url_for('index'))
 
@@ -59,27 +48,16 @@ def add():
 
 @app.route('/delete/<int:post_id>')
 def delete(post_id):
-    # Load existing posts
-    with open('data.json', 'r') as file:
-        blog_posts = json.load(file)
-
-    # Find the blog post with the given id and remove it from the list
+    blog_posts = load_posts()
     blog_posts = [post for post in blog_posts if post['id'] != post_id]
-
-    # Save back to the JSON file
-    with open('data.json', 'w') as file:
-        json.dump(blog_posts, file, indent=4)
-
-    # Redirect back to the home page
+    save_posts(blog_posts)
     return redirect(url_for('index'))
 
 
 @app.route('/update/<int:post_id>', methods=['GET', 'POST'])
 def update(post_id):
-    # Fetch the blog post by ID
-    post = fetch_post_by_id(post_id)
+    post = get_post_by_id(post_id)
     if post is None:
-        # Post not found
         return "Post not found", 404
 
     if request.method == 'POST':
@@ -88,27 +66,18 @@ def update(post_id):
         title = request.form.get('title')
         content = request.form.get('content')
 
-        # Load existing posts
-        with open('data.json', 'r') as file:
-            blog_posts = json.load(file)
-
-        # Find and update the post
+        # Load, update, and save
+        blog_posts = load_posts()
         for p in blog_posts:
             if p['id'] == post_id:
                 p['author'] = author
                 p['title'] = title
                 p['content'] = content
                 break
+        save_posts(blog_posts)
 
-        # Save back to the JSON file
-        with open('data.json', 'w') as file:
-            json.dump(blog_posts, file, indent=4)
-
-        # Redirect back to index
         return redirect(url_for('index'))
 
-    # Else, it's a GET request
-    # So display the update.html page
     return render_template('update.html', post=post)
 
 
